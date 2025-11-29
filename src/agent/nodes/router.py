@@ -13,27 +13,31 @@ class RouteResponse(BaseModel):
     )
 
 
-def _get_llm():
+def _get_router_llm():
+    """Use a separate model for routing that's better at following instructions."""
     settings = get_settings()
     if settings.use_groq:
         from langchain_groq import ChatGroq
+
+        # Use llama for routing - it follows structured output better than qwen3
         return ChatGroq(
-            model=settings.groq_model,
+            model=settings.groq_router_model,
             api_key=settings.groq_api_key,
-            temperature=0
+            temperature=0,
         )
     else:
         from langchain_ollama import ChatOllama
+
         return ChatOllama(
             model=settings.ollama_model,
             base_url=settings.ollama_base_url,
-            temperature=0
+            temperature=0,
         )
 
 
 class RouterNode:
     def __init__(self, model_name: str = None):
-        self.llm = _get_llm()
+        self.llm = _get_router_llm()
         self.structured_llm = self.llm.with_structured_output(RouteResponse)
 
     def __call__(self, state: AgentState):

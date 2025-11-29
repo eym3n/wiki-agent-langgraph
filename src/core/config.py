@@ -6,6 +6,7 @@ from typing import Optional
 class Settings(BaseSettings):
     groq_api_key: Optional[str] = None
     groq_model: str = "qwen/qwen3-32b"
+    groq_router_model: str = "llama-3.3-70b-versatile"
     ollama_model: str = "PetrosStav/gemma3-tools:4b"
     ollama_base_url: str = "http://localhost:11434"
     host: str = "0.0.0.0"

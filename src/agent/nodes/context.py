@@ -1,10 +1,9 @@
 import re
 import json
 from datetime import datetime
-from typing import List, Iterable, Any
+from typing import List, Any
 import logging
 from langchain_core.tools import StructuredTool
-from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage
 from langchain_core.messages.base import BaseMessage
 from src.agent.state import AgentState
@@ -15,6 +14,27 @@ logger = logging.getLogger(__name__)
 
 
 WIKIPEDIA_URL_PATTERN = re.compile(r"https?://[^\s\"'<>)]+")
+
+
+def _get_llm():
+    settings = get_settings()
+    if settings.use_groq:
+        from langchain_groq import ChatGroq
+
+        return ChatGroq(
+            model=settings.groq_model,
+            api_key=settings.groq_api_key,
+            temperature=0,
+            reasoning_format="hidden",
+        )
+    else:
+        from langchain_ollama import ChatOllama
+
+        return ChatOllama(
+            model=settings.ollama_model,
+            base_url=settings.ollama_base_url,
+            temperature=0,
+        )
 
 
 def _collect_urls_from_obj(obj: Any, seen: set[str], urls: List[str]):
@@ -47,33 +67,12 @@ def _extract_wikipedia_urls(messages: List[BaseMessage]) -> List[str]:
     urls: List[str] = []
     seen: set[str] = set()
     for message in messages:
-        # Log message type and content for debugging
-        # logger.info(f"Scanning message type: {type(message)}")
-
-        # For ToolMessage, the content is often the tool output directly
-        # But ToolMessage doesn't have a "name" attribute in some versions, it uses "name" or "tool_name" or we check type
-        # Actually ToolMessage has 'name' field.
-        # Let's check if the message is indeed a ToolMessage or has tool output.
-
-        # The previous check `if hasattr(message, "name") ...` might fail if `name` isn't what we expect or if it's not a ToolMessage.
-        # We should check for ToolMessage type explicitly if possible, or just leniently scan everything.
-
-        # Also, the logs show that the tool output MIGHT NOT contain the URL explicitly if it's just a summary.
-        # "Request URL: .../api.php..." -> This is wikipediaapi logging the request.
-        # The tool output is what the MCP server returns.
-        # If the MCP server returns just text, and that text doesn't contain "https://en.wikipedia.org...", then we won't find it.
-
-        # We need to check if `wikipedia-mcp` tool outputs include the URL.
-        # If not, we might need to synthesize the URL from the title if available.
-        # But let's first ensure we are scanning the right content.
-
         _collect_urls_from_obj(getattr(message, "content", None), seen, urls)
         _collect_urls_from_obj(getattr(message, "additional_kwargs", None), seen, urls)
         _collect_urls_from_obj(getattr(message, "tool_calls", None), seen, urls)
         _collect_urls_from_obj(getattr(message, "artifact", None), seen, urls)
 
         # If we have a tool call with arguments that include a 'title', we can construct the URL as a fallback.
-        # This is a heuristic.
         if hasattr(message, "tool_calls") and message.tool_calls:
             for tc in message.tool_calls:
                 if tc.get("name") in [
@@ -84,9 +83,6 @@ def _extract_wikipedia_urls(messages: List[BaseMessage]) -> List[str]:
                     args = tc.get("args", {})
                     title = args.get("title")
                     if title:
-                        # Construct URL
-                        # Assuming English wikipedia for now or use logic to determine language
-                        # Title needs to be URL encoded (spaces to underscores etc)
                         safe_title = title.replace(" ", "_")
                         url = f"https://en.wikipedia.org/wiki/{safe_title}"
                         if url not in seen:
@@ -97,16 +93,8 @@ def _extract_wikipedia_urls(messages: List[BaseMessage]) -> List[str]:
 
 
 class ContextNode:
-    def __init__(
-        self, tools: List[StructuredTool], model_name: str = None
-    ):
-        settings = get_settings()
-        model = model_name or settings.ollama_model
-        self.llm = ChatOllama(
-            model=model,
-            base_url=settings.ollama_base_url,
-            temperature=0
-        )
+    def __init__(self, tools: List[StructuredTool], model_name: str = None):
+        self.llm = _get_llm()
         self.llm_with_tools = self.llm.bind_tools(tools)
 
     def __call__(self, state: AgentState):
@@ -118,8 +106,6 @@ class ContextNode:
         logger.info(f"ContextNode response: {response}")
 
         # Only extract URLs from the NEW response, not from history
-        # The state.referenced_article_urls should already be reset at the start of each run
-        # So we just accumulate URLs found in THIS run
         urls = _extract_wikipedia_urls([response])
 
         # Merge with URLs already found in this run (from previous context node calls in this run)

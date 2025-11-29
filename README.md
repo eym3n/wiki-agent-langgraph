@@ -1,6 +1,6 @@
 # Wiki-Bot with LangGraph and MCP
 
-A multi-agent Wikipedia research assistant using [LangGraph](https://langchain-ai.github.io/langgraph/) and [Ollama](https://ollama.ai/), leveraging [wikipedia-mcp](https://github.com/modelcontextprotocol/servers/tree/main/src/wikipedia) for Wikipedia access via the Model Context Protocol (MCP).
+A multi-agent Wikipedia research assistant using [LangGraph](https://langchain-ai.github.io/langgraph/) and [Groq](https://groq.com/), leveraging [wikipedia-mcp](https://github.com/modelcontextprotocol/servers/tree/main/src/wikipedia) for Wikipedia access via the Model Context Protocol (MCP).
 
 Exposed as a **FastAPI** application with streaming support and SQLite persistence.
 
@@ -8,7 +8,7 @@ Exposed as a **FastAPI** application with streaming support and SQLite persisten
 
 - Python 3.12+
 - `uv` package manager
-- [Ollama](https://ollama.ai/) installed and running
+- [Groq API Key](https://console.groq.com/) **OR** [Ollama](https://ollama.ai/) installed locally
 
 ## Setup
 
@@ -17,18 +17,25 @@ Exposed as a **FastAPI** application with streaming support and SQLite persisten
     uv sync
     ```
 
-2.  **Pull the Ollama Model:**
+2.  **Environment Variables:**
+    Create a `.env` file. If `GROQ_API_KEY` is set, Groq will be used. Otherwise, falls back to local Ollama.
+
+    **Option A: Use Groq (cloud)**
     ```bash
-    ollama pull PetrosStav/gemma3-tools:4b
+    GROQ_API_KEY=your_groq_api_key_here
+    GROQ_MODEL=qwen/qwen3-32b
     ```
 
-3.  **Environment Variables (Optional):**
-    Create a `.env` file to customize settings:
+    **Option B: Use Ollama (local)**
     ```bash
+    # No GROQ_API_KEY means Ollama will be used
     OLLAMA_MODEL=PetrosStav/gemma3-tools:4b
     OLLAMA_BASE_URL=http://localhost:11434
-    HOST=0.0.0.0
-    PORT=8000
+    ```
+
+    Pull the Ollama model if using local:
+    ```bash
+    ollama pull PetrosStav/gemma3-tools:4b
     ```
 
 ## Usage
@@ -69,7 +76,7 @@ data: [DONE]
 
 - **FastAPI**: Handles HTTP requests and SSE streaming.
 - **LangGraph**: Manages the multi-agent workflow and state.
-- **Ollama**: Local LLM inference.
+- **Groq/Ollama**: LLM inference via Groq cloud (`qwen/qwen3-32b`) or local Ollama (`PetrosStav/gemma3-tools:4b`).
 - **SQLite**: Persists conversation state (checkpoints).
 - **MCP Integration**: Connects to `wikipedia-mcp` via stdio.
 

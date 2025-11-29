@@ -4,11 +4,12 @@ from datetime import datetime
 from typing import List, Iterable, Any
 import logging
 from langchain_core.tools import StructuredTool
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
 from langchain_core.messages import SystemMessage
 from langchain_core.messages.base import BaseMessage
 from src.agent.state import AgentState
 from src.agent.prompts.context_prompt import get_context_prompt
+from src.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +98,15 @@ def _extract_wikipedia_urls(messages: List[BaseMessage]) -> List[str]:
 
 class ContextNode:
     def __init__(
-        self, tools: List[StructuredTool], model_name: str = "gemini-2.5-flash"
+        self, tools: List[StructuredTool], model_name: str = None
     ):
-        self.llm = ChatGoogleGenerativeAI(model=model_name, temperature=0)
+        settings = get_settings()
+        model = model_name or settings.ollama_model
+        self.llm = ChatOllama(
+            model=model,
+            base_url=settings.ollama_base_url,
+            temperature=0
+        )
         self.llm_with_tools = self.llm.bind_tools(tools)
 
     def __call__(self, state: AgentState):

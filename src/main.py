@@ -37,10 +37,6 @@ app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 
 def start():
     settings = get_settings()
-    if not settings.google_api_key:
-        print("Error: GOOGLE_API_KEY not found in environment.")
-        sys.exit(1)
-
     uvicorn.run("src.main:app", host=settings.host, port=settings.port, reload=True)
 
 

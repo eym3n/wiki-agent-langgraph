@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Literal
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
 from src.agent.state import AgentState
 from src.agent.prompts.route_prompt import get_route_prompt
+from src.core.config import get_settings
 
 
 class RouteResponse(BaseModel):
@@ -14,8 +15,14 @@ class RouteResponse(BaseModel):
 
 
 class RouterNode:
-    def __init__(self, model_name: str = "gemini-2.5-flash"):
-        self.llm = ChatGoogleGenerativeAI(model=model_name, temperature=0)
+    def __init__(self, model_name: str = None):
+        settings = get_settings()
+        model = model_name or settings.ollama_model
+        self.llm = ChatOllama(
+            model=model,
+            base_url=settings.ollama_base_url,
+            temperature=0
+        )
         self.structured_llm = self.llm.with_structured_output(RouteResponse)
 
     def __call__(self, state: AgentState):

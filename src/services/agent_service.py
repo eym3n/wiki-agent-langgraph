@@ -75,7 +75,6 @@ class AgentService:
             async for event in self.agent.astream(
                 initial_state, config=config, stream_mode="updates"
             ):
-                logger.debug(f"Received event: {event}")
                 for node, values in event.items():
                     if "referenced_article_urls" in values:
                         latest_references = values["referenced_article_urls"] or []
@@ -83,6 +82,18 @@ class AgentService:
                     if node in ["synthesize", "reply"] and values.get("messages"):
                         msg = values["messages"][-1]
                         content = getattr(msg, "content", None)
+                        # Handle case where content might be a list (Gemini format)
+                        if isinstance(content, list):
+                            text_parts = []
+                            for part in content:
+                                if isinstance(part, dict) and "text" in part:
+                                    text_parts.append(part["text"])
+                                elif isinstance(part, str):
+                                    text_parts.append(part)
+                            content = "\n".join(text_parts)
+                        # Handle empty string - fallback to string representation
+                        if not content:
+                            content = str(msg) if msg else None
                         if content:
                             payload = {"content": content}
                             if latest_references:

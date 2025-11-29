@@ -1,7 +1,7 @@
-
 from typing import Literal
 from langgraph.graph import END
 from src.agent.state import AgentState
+
 
 def should_continue(state: AgentState) -> Literal["tools", "synthesize"]:
     messages = state.messages
@@ -9,6 +9,7 @@ def should_continue(state: AgentState) -> Literal["tools", "synthesize"]:
     if last_message.tool_calls:
         return "tools"
     return "synthesize"
+
 
 def route_decision(state: AgentState) -> Literal["context", "reply"]:
     if state.next_step == "context":

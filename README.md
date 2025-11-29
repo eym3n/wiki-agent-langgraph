@@ -1,14 +1,14 @@
 # Wiki-Bot with LangGraph and MCP
 
-This project demonstrates a multi-agent application using [LangGraph](https://langchain-ai.github.io/langgraph/) and [Google Gemini](https://ai.google.dev/), leveraging [wikipedia-mcp](https://github.com/modelcontextprotocol/servers/tree/main/src/wikipedia) for Wikipedia access via the Model Context Protocol (MCP).
+A multi-agent Wikipedia research assistant using [LangGraph](https://langchain-ai.github.io/langgraph/) and [Ollama](https://ollama.ai/), leveraging [wikipedia-mcp](https://github.com/modelcontextprotocol/servers/tree/main/src/wikipedia) for Wikipedia access via the Model Context Protocol (MCP).
 
-It is exposed as a **FastAPI** application with streaming support and SQLite persistence, structured for scalability.
+Exposed as a **FastAPI** application with streaming support and SQLite persistence.
 
 ## Prerequisites
 
 - Python 3.12+
 - `uv` package manager
-- Google Gemini API Key
+- [Ollama](https://ollama.ai/) installed and running
 
 ## Setup
 
@@ -17,11 +17,18 @@ It is exposed as a **FastAPI** application with streaming support and SQLite per
     uv sync
     ```
 
-2.  **Environment Variables:**
-    Copy `.env.example` to `.env` and add your Google API key.
+2.  **Pull the Ollama Model:**
     ```bash
-    cp .env.example .env
-    # Edit .env and add GOOGLE_API_KEY=...
+    ollama pull PetrosStav/gemma3-tools:4b
+    ```
+
+3.  **Environment Variables (Optional):**
+    Create a `.env` file to customize settings:
+    ```bash
+    OLLAMA_MODEL=PetrosStav/gemma3-tools:4b
+    OLLAMA_BASE_URL=http://localhost:11434
+    HOST=0.0.0.0
+    PORT=8000
     ```
 
 ## Usage
@@ -29,7 +36,7 @@ It is exposed as a **FastAPI** application with streaming support and SQLite per
 Start the server:
 
 ```bash
-uv run src/main.py
+uv run uvicorn src.main:app --reload
 ```
 
 The server runs at `http://0.0.0.0:8000`.
@@ -46,14 +53,32 @@ The server runs at `http://0.0.0.0:8000`.
 }
 ```
 
-**Response:** Server-Sent Events (SSE) stream.
+**Response:** Server-Sent Events (SSE) stream with routing info, tool calls, content, and Wikipedia references.
+
+**Example Events:**
+```
+data: {"router": "context"}
+data: {"tool": "search_wikipedia"}
+data: {"tool": "get_summary", "references": ["https://en.wikipedia.org/wiki/Emmanuel_Macron"]}
+data: {"content": "Emmanuel Macron is the current president of France..."}
+data: {"references": ["https://en.wikipedia.org/wiki/Emmanuel_Macron"]}
+data: [DONE]
+```
 
 ## Architecture
 
-- **FastAPI**: Handles HTTP requests and streaming.
-- **LangGraph**: Manages the agent workflow and state.
+- **FastAPI**: Handles HTTP requests and SSE streaming.
+- **LangGraph**: Manages the multi-agent workflow and state.
+- **Ollama**: Local LLM inference.
 - **SQLite**: Persists conversation state (checkpoints).
 - **MCP Integration**: Connects to `wikipedia-mcp` via stdio.
+
+## Agent Flow
+
+1. **Router Node**: Determines if the query needs Wikipedia research (`context`) or a quick reply (`reply`).
+2. **Context Node**: Searches Wikipedia using MCP tools, gathers relevant articles.
+3. **Synthesize Node**: Produces a comprehensive answer with article snapshots and references.
+4. **Reply Node**: Handles conversational queries that don't require research.
 
 ## Project Structure
 
